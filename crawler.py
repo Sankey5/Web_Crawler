@@ -1,12 +1,13 @@
 from bs4 import BeautifulSoup   # Crawls and scrapes site content
 from tld import get_fld         # Parses for domain names
+import mysql.connector          # MySQL database to store script contents/json
 import requests                 # Connects and gets content from sites
 import queue                    # Queues sites/domains to search
 import time                     # Times program
 import re                       # Regular expressions used for searching the data in webpages
 
 class Scraper():
-    def __init__(self, explored_domains=None):
+    def __init__(self, database, explored_domains=None):
         # -------Variables----------------------------
         self.timeout = 5                        # Used for connections functions
         self.startTime = None                   # Time that the crawler started
@@ -21,10 +22,17 @@ class Scraper():
         self.unexploredDomains = queue.Queue()  # Queue of unexplored domains
         self.unexploredSites = queue.Queue()    # Queue of unexplored sites
         # -------Database-----------------------------
-        self.connector = None                   # A connection to the mysqlDB
+        self.database = database                # Holds the credentials for the MySQL connection
+        self.connector = None                   # Holds the connection to the MySQLDB
         self.cursor = None                      # Enables execution of a prepared statement
 
     def scrape(self, url):
+        # Connects to the mysql database
+        self.connector = mysql.connector.connect(user=self.database["username"],
+                                password=self.database["password"],
+                                host=self.database["host"],
+                                database=self.database["database"])
+
         self.startTime = time.time()                        # Start timer
 
         starting_domain = get_domain("https://www." + url)  # Starting domain to search from.

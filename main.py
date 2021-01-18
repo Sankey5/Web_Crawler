@@ -8,13 +8,13 @@ explored_domains = ["instagram.com", "twitter.com", "linkedin.com", "pinterest.c
 
 # Database connection
 load_dotenv()
-database_connection = [os.getenv("USER"),
-                       os.getenv("PASSWORD"),
-                       os.getenv("HOST"),
-                       os.getenv("DATABASE")]
+database_connection = {"username":os.getenv("USERNAME"),
+                       "password":os.getenv("PASSWORD"),
+                       "host":os.getenv("HOST"),
+                       "database":os.getenv("DATABASE")}
 
 if __name__ == '__main__':
-    crawl = crawler.Scraper(explored_domains=explored_domains)
+    crawl = crawler.Scraper(database_connection, explored_domains=explored_domains)
 
     for site in sites:
         crawl.scrape(site)
