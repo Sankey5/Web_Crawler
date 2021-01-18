@@ -3,7 +3,7 @@ from tld import get_fld         # Parses for domain names
 import requests                 # Connects and gets content from sites
 import queue                    # Queues sites/domains to search
 import time                     # Times program
-import re
+import re                       # Regular expressions used for searching the data in webpages
 
 class Scraper():
     def __init__(self, explored_domains=None):
