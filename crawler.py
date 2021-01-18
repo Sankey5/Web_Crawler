@@ -21,18 +21,16 @@ class Scraper():
         self.exploredDomains = explored_domains # List of explored domains
         self.unexploredDomains = queue.Queue()  # Queue of unexplored domains
         self.unexploredSites = queue.Queue()    # Queue of unexplored sites
+        self.match = []
         # -------Database-----------------------------
         self.database = database                # Holds the credentials for the MySQL connection
         self.connector = None                   # Holds the connection to the MySQLDB
         self.cursor = None                      # Enables execution of a prepared statement
+        self.add_match = ("INSERT INTO schema_match "
+                          "(url, json)"
+                          "VALUES (%s, %s)")
 
     def scrape(self, url):
-        # Connects to the mysql database
-        self.connector = mysql.connector.connect(user=self.database["username"],
-                                password=self.database["password"],
-                                host=self.database["host"],
-                                database=self.database["database"])
-
         self.startTime = time.time()                        # Start timer
 
         starting_domain = get_domain("https://www." + url)  # Starting domain to search from.
@@ -41,12 +39,16 @@ class Scraper():
 
         self.unexploredDomains.put(starting_domain)         # Put the starting domain in the queue
 
-        self.explore_domains()  # Crawl the domains, look for javascript, and add more listed sites
+        try:
+            self.explore_domains()  # Crawl the domains, look for javascript, and add more listed sites
+        except:
+            self.cursor.close()
+        finally:
+            self.cursor.close()
+            # print("Could not connect to a site: {}".format(self.url))
+            self.endTime = time.time()                      # End timer
 
-        # print("Could not connect to a site: {}".format(self.url))
-        self.endTime = time.time()                          # End timer
-
-        print("Program took {}".format(self.endTime - self.startTime))
+            print("Program took {}".format(self.endTime - self.startTime))
 
 # ---Get-Site-Content------------------------------
 
@@ -99,12 +101,14 @@ class Scraper():
                 print("skipped")
                 continue
 
-            self.exploredDomains.append(self.domain)  # Add it to the list of explored sites
+            self.exploredDomains.append(self.domain)        # Add it to the list of explored sites
 
             print("-----------------------------------------")
             print("Exploring {}".format(self.domain))
             
-            self.explore_sites()                        # Explores the sites in a domain
+            self.explore_sites()                            # Explores the sites in a domain
+
+            self.export_to_database()                       # Export the scraped data to the database
 
             print("Domains left - {}".format(self.unexploredDomains.qsize()))
 
@@ -144,7 +148,7 @@ class Scraper():
         
             self.prepare(self.url)          # Get site html
 
-            self.checkScripts()             # Check for specified inline javascript
+            self.checkScripts()             # Check for specified inline javascript and add matches to the database
 
             self.add_links()                # Checks to site for links to external sites for scraping
             
@@ -153,15 +157,15 @@ class Scraper():
     def checkScripts(self):
         """
         Looks through a web page and check for schema.org scripts.
-        If a script is found, log the url that it was found on,
-        and the content of the script.
+        If a script is found, log the url that it was found on, and the content of the script.
         :return:
         """
 
         for script in self.soup.find_all("script"):             # Finds all script tags on a webpage
             #print(script.string)
             if re.search(r"schema\.org", str(script.string)):   # If a script contains the schema.org json,
-                print(script.string)                            # Print the content
+                self.match.append({"url":self.url,              # add the url and json found to the list of
+                                   "json":script.string})       # matches found.
                 break
 
     def add_links(self):
@@ -181,6 +185,40 @@ class Scraper():
                 # Used this to error check duplicate domains.
                 # print("Difference - {}".format(len(list(self.unexploredDomains.queue)) - len(set(self.unexploredDomains.queue))))
                 self.unexploredDomains.put(domain)
+
+    # ---Database-functions-----------------------
+
+    def export_to_database(self):
+        """
+        Takes the data scraped from a domain and exports it to the MySQL database
+        The database table looks like this:
+            (CREATE TABLE schema_match (
+                url varchar() NOT NULL,
+                json varchar() NOT NULL,
+                PRIMARY KEY(url)) ENGINE=InnoDB)
+        :return:
+        """
+
+        print("Transferring data to the database")
+
+        # Connects to the mysql database
+        self.connector = mysql.connector.connect(user=self.database["username"],
+                                                 password=self.database["password"],
+                                                 host=self.database["host"],
+                                                 database=self.database["database"])
+
+        self.cursor = self.connector.cursor(prepared=True)  # Enables the execution of a prepared statement
+
+        for i in range(len(self.match)):            # For each match found in a domain,
+            match = self.match.pop(i)               # Take an item from the match list
+
+            self.cursor.execute(self.add_match,     # Add the match into the database
+                                (match["url"],
+                                 match["json"]))
+
+        self.cursor.commit()    # Make sure the data is committed to the database
+        self.cursor.close()     # Close the connections
+        self.connector.close()
 
 def get_domain(link):
     """
