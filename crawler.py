@@ -1,5 +1,5 @@
 from bs4 import BeautifulSoup   # Crawls and scrapes site content
-from tld import get_fld                      # Parses for domain names
+from tld import get_fld         # Parses for domain names
 import requests                 # Connects and gets content from sites
 import queue                    # Queues sites/domains to search
 import time                     # Times program
@@ -20,21 +20,23 @@ class Scraper():
         self.exploredDomains = explored_domains # List of explored domains
         self.unexploredDomains = queue.Queue()  # Queue of unexplored domains
         self.unexploredSites = queue.Queue()    # Queue of unexplored sites
+        # -------Database-----------------------------
+        self.connector = None                   # A connection to the mysqlDB
+        self.cursor = None                      # Enables execution of a prepared statement
 
     def scrape(self, url):
-        self.startTime = time.time()                    # Start timer
+        self.startTime = time.time()                        # Start timer
 
-        starting_domain = get_domain("https://" + url)
+        starting_domain = get_domain("https://www." + url)  # Starting domain to search from.
 
         print(starting_domain)
 
-        self.unexploredDomains.put(starting_domain)     # Set the top level domain for this scraper
+        self.unexploredDomains.put(starting_domain)         # Put the starting domain in the queue
 
-        # Crawl the domains, look for javascript, and add more listed sites
-        self.explore_domains()
+        self.explore_domains()  # Crawl the domains, look for javascript, and add more listed sites
 
         # print("Could not connect to a site: {}".format(self.url))
-        self.endTime = time.time()                  # End timer
+        self.endTime = time.time()                          # End timer
 
         print("Program took {}".format(self.endTime - self.startTime))
 
