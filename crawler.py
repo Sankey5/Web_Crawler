@@ -7,16 +7,16 @@ import re
 
 class Scraper():
     def __init__(self, explored_domains=None):
-#-------Variables----------------------------
+        # -------Variables----------------------------
         self.timeout = 5                        # Used for connections functions
         self.startTime = None                   # Time that the crawler started
         self.endTime = None                     # Time the crawler finished
-#-------Used-to-scrape-----------------------
+        # -------Used-to-scrape-----------------------
         self.domain = None                      # Top level domain of the website currently being scraped
         self.url = None                         # Current site being crawled
         self.site = None                        # Raw data from post request
         self.soup = None                        # Holds to soup object and site html
-#-------Links--------------------------------
+        # -------Links--------------------------------
         self.exploredDomains = explored_domains # List of explored domains
         self.unexploredDomains = queue.Queue()  # Queue of unexplored domains
         self.unexploredSites = queue.Queue()    # Queue of unexplored sites
@@ -33,7 +33,7 @@ class Scraper():
         # Crawl the domains, look for javascript, and add more listed sites
         self.explore_domains()
 
-        #print("Could not connect to a site: {}".format(self.url))
+        # print("Could not connect to a site: {}".format(self.url))
         self.endTime = time.time()                  # End timer
 
         print("Program took {}".format(self.endTime - self.startTime))
@@ -76,7 +76,7 @@ class Scraper():
                 i += 1
                 time.sleep(self.timeout)
 
-#---Explore-Domains-------------------------
+# ---Explore-Domains-------------------------
 
     # Looks through all links found and explores them
     def explore_domains(self):
@@ -113,7 +113,7 @@ class Scraper():
                 if site not in list(self.unexploredSites.queue):    # If the site hasn't been explored, add it.
                     self.unexploredSites.put(site.text)
 
-#---Explore-Sites----------------------------
+# ---Explore-Sites----------------------------
     
     def explore_sites(self):
         i = 0
@@ -134,11 +134,25 @@ class Scraper():
         
             self.prepare(self.url)          # Get site html
 
-            # self.checkScripts()           # Check for specified inline javascript
+            self.checkScripts()             # Check for specified inline javascript
 
             self.add_links()                # Checks to site for links to external sites for scraping
             
             i += 1
+
+    def checkScripts(self):
+        """
+        Looks through a web page and check for schema.org scripts.
+        If a script is found, log the url that it was found on,
+        and the content of the script.
+        :return:
+        """
+
+        for script in self.soup.find_all("script"):             # Finds all script tags on a webpage
+            #print(script.string)
+            if re.search(r"schema\.org", str(script.string)):   # If a script contains the schema.org json,
+                print(script.string)                            # Print the content
+                break
 
     def add_links(self):
         """
