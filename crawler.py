@@ -262,9 +262,19 @@ class Scraper():
                                 (match["url"],
                                  match["json"]))
 
+        """unexplored_domains table should look like this:
+                CREATE TABLE unexplored_table (
+                    domain varchar() NOT NULL,
+                    PRIMARY KEY(domain)) ENGINE=InnoDB)"""
+
         remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
                          "WHERE %s = domain")
         self.cursor.execute(remove_domain, self.domain)
+
+        """unexplored_domains table should look like this:
+            CREATE TABLE explored_table (
+                domain varchar() NOT NULL,
+                PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
         add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
                       "(domain)"
