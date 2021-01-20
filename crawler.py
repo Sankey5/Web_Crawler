@@ -178,6 +178,7 @@ class Scraper():
         If that domain has been explored already, it will pass it. Otherwise, it
         will add it to the list of domains to crawl.
         """
+        unexplored_domains = []
 
         for link in self.soup.find_all("a", href=True):
             new_link = link['href']                     # Extracts the link from an anchor tag
@@ -188,6 +189,11 @@ class Scraper():
                 # Used this to error check duplicate domains.
                 # print("Difference - {}".format(len(list(self.unexploredDomains.queue)) - len(set(self.unexploredDomains.queue))))
                 self.unexploredDomains.put(domain)
+                unexplored_domains.append(domain)
+
+        self.export_unexplored_domains(unexplored_domains)  # Exports domains found on that site to the database
+
+
 
     # ---Database-functions-----------------------
 
@@ -234,6 +240,26 @@ class Scraper():
                 self.exploredDomains.append(domain) # Add it to the list
 
         self.close_database()
+
+    def export_unexplored_domains(self, domains):
+        """
+        Takes a list of unexplored domains and exports them to the database
+        :param domains: A list of unexplored domains
+        :return:
+        """
+
+        add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
+                      "(domain)"
+                      "VALUES "
+                      "(%s)")
+
+        self.open_database()
+
+        for domain in domains:                              # For every unexplored domain,
+            self.cursor.execute(add_domain, domain)         # add it to the database
+
+        self.close_database()
+
 
     def export_to_database(self):
         """
