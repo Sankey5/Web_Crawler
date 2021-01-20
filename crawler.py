@@ -30,22 +30,25 @@ class Scraper():
                           "(url, json)"
                           "VALUES (%s, %s)")
 
-    def scrape(self, url):
-        self.startTime = time.time()                        # Start timer
+    def scrape(self, url=None):
 
+        self.startTime = time.time()                        # Start timer
         starting_domain = get_domain("https://www." + url)  # Starting domain to search from.
 
         print(starting_domain)
 
-        self.unexploredDomains.put(starting_domain)         # Put the starting domain in the queue
+        self.get_queued_domains()
+
+        self.get_completed_domains()
+
+        if url and url not in self.exploredDomains:         # If a url is given and not already explored,
+            self.unexploredDomains.put(starting_domain)     # Put the starting domain in the queue
 
         try:
             self.explore_domains()  # Crawl the domains, look for javascript, and add more listed sites
         except:
-            self.cursor.close()
+            self.close_database()
         finally:
-            self.cursor.close()
-            # print("Could not connect to a site: {}".format(self.url))
             self.endTime = time.time()                      # End timer
 
             print("Program took {}".format(self.endTime - self.startTime))
@@ -108,7 +111,11 @@ class Scraper():
             
             self.explore_sites()                            # Explores the sites in a domain
 
+            self.open_database()                            # Opens the connection to the database
+
             self.export_to_database()                       # Export the scraped data to the database
+
+            self.close_database()                           # Closes the connection to the database
 
             print("Domains left - {}".format(self.unexploredDomains.qsize()))
 
@@ -188,6 +195,49 @@ class Scraper():
 
     # ---Database-functions-----------------------
 
+    def open_database(self):
+        """
+        Opens the connection to the database
+        :return:
+        """
+        # Connects to the mysql database using the supplied credentials
+        self.connector = mysql.connector.connect(user=self.database["username"],
+                                                 password=self.database["password"],
+                                                 host=self.database["host"],
+                                                 database=self.database["database"])
+
+        self.cursor = self.connector.cursor(prepared=True)  # Enables the execution of a prepared statement
+
+    def close_database(self):
+        """
+        Closes the connection to the database
+        :return:
+        """
+        self.cursor.close()  # Close the connections
+        self.connector.close()
+
+    def get_queued_domains(self):
+        self.open_database()
+
+        get_queried_domains = ("SELECT * FROM queued_domains")  # Get queued domains
+        self.cursor.execute(get_queried_domains)
+
+        for domain in self.cursor:
+            self.unexploredDomains.put(domain)
+
+        self.close_database()
+
+    def get_completed_domains(self):
+        self.open_database()
+
+        get_queried_domains = ("SELECT * FROM completed_domains")  # Get completed domains
+        self.cursor.execute(get_queried_domains)
+
+        for domain in self.cursor:
+            self.exploredDomains.put(domain)
+
+        self.close_database()
+
     def export_to_database(self):
         """
         Takes the data scraped from a domain and exports it to the MySQL database
@@ -196,18 +246,13 @@ class Scraper():
                 url varchar() NOT NULL,
                 json varchar() NOT NULL,
                 PRIMARY KEY(url)) ENGINE=InnoDB)
+
+        This function should always be prepended with the open_database()
+        and close_database() functions.
         :return:
         """
 
         print("Transferring data to the database")
-
-        # Connects to the mysql database
-        self.connector = mysql.connector.connect(user=self.database["username"],
-                                                 password=self.database["password"],
-                                                 host=self.database["host"],
-                                                 database=self.database["database"])
-
-        self.cursor = self.connector.cursor(prepared=True)  # Enables the execution of a prepared statement
 
         for i in range(len(self.match)):            # For each match found in a domain,
             match = self.match.pop(i)               # Take an item from the match list
@@ -216,9 +261,17 @@ class Scraper():
                                 (match["url"],
                                  match["json"]))
 
+        remove_domain = ("DELETE FROM queued_domains "      # Removing the domain from the queued domains list
+                         "WHERE %s = domain")
+        self.cursor.execute(remove_domain, self.domain)
+
+        add_domain = ("INSERT INTO completed_domains "      # Adding the domain to the completed domains list
+                      "(domain)"
+                      "VALUES "
+                      "(%s)")
+        self.cursor.execute(add_domain, self.domain)
+
         self.cursor.commit()    # Make sure the data is committed to the database
-        self.cursor.close()     # Close the connections
-        self.connector.close()
 
 def get_domain(link):
     """

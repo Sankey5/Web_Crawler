@@ -17,4 +17,4 @@ if __name__ == '__main__':
     crawl = crawler.Scraper(database_connection, explored_domains=explored_domains)
 
     for site in sites:
-        crawl.scrape(site)
+        crawl.scrape(url=site)
