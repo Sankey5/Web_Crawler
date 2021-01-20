@@ -26,9 +26,6 @@ class Scraper():
         self.database = database                # Holds the credentials for the MySQL connection
         self.connector = None                   # Holds the connection to the MySQLDB
         self.cursor = None                      # Enables execution of a prepared statement
-        self.add_match = ("INSERT INTO schema_match "
-                          "(url, json)"
-                          "VALUES (%s, %s)")
 
     def scrape(self, url=None):
 
@@ -37,16 +34,16 @@ class Scraper():
 
         print(starting_domain)
 
-        self.get_queued_domains()
+        self.get_unexplored_domains()                       # Get queued domains from database
 
-        self.get_completed_domains()
+        self.get_explored_domains()                         # Get completed domains from database
 
         if url and url not in self.exploredDomains:         # If a url is given and not already explored,
-            self.unexploredDomains.put(starting_domain)     # Put the starting domain in the queue
+            self.unexploredDomains.put(starting_domain)     # Put the given domain in the queue
 
         try:
-            self.explore_domains()  # Crawl the domains, look for javascript, and add more listed sites
-        except:
+            self.explore_domains()  # Crawl the domains, look for javascript, and add more listed domains
+        except KeyboardInterrupt:
             self.close_database()
         finally:
             self.endTime = time.time()                      # End timer
@@ -187,7 +184,6 @@ class Scraper():
             domain = get_domain(new_link)               # Gets a domain if it exists
 
             # If the link has a domain that has not been explored, add it to the unexplored list.
-
             if domain and domain not in self.exploredDomains and domain not in list(self.unexploredDomains.queue):
                 # Used this to error check duplicate domains.
                 # print("Difference - {}".format(len(list(self.unexploredDomains.queue)) - len(set(self.unexploredDomains.queue))))
@@ -216,25 +212,26 @@ class Scraper():
         self.cursor.close()  # Close the connections
         self.connector.close()
 
-    def get_queued_domains(self):
+    def get_unexplored_domains(self):
         self.open_database()
 
-        get_queried_domains = ("SELECT * FROM queued_domains")  # Get queued domains
-        self.cursor.execute(get_queried_domains)
+        get_unexplored_domains = ("SELECT * FROM unexplored_domains")  # Get unexplored domains
+        self.cursor.execute(get_unexplored_domains)
 
-        for domain in self.cursor:
+        for domain in self.cursor:                  # Move each query to the unexplored domains list
             self.unexploredDomains.put(domain)
 
         self.close_database()
 
-    def get_completed_domains(self):
+    def get_explored_domains(self):
         self.open_database()
 
-        get_queried_domains = ("SELECT * FROM completed_domains")  # Get completed domains
-        self.cursor.execute(get_queried_domains)
+        get_explored_domains = ("SELECT * FROM explored_domains")  # Get completed domains
+        self.cursor.execute(get_explored_domains)
 
-        for domain in self.cursor:
-            self.exploredDomains.put(domain)
+        for domain in self.cursor:                  # Move each query to the explored domains list
+            if domain not in self.exploredDomains:  # If this query is not in the given explored domains list,
+                self.exploredDomains.append(domain) # Add it to the list
 
         self.close_database()
 
@@ -254,24 +251,28 @@ class Scraper():
 
         print("Transferring data to the database")
 
+        add_match = ("INSERT INTO schema_match "    # MySQL to add a match to the database
+                     "(url, json)"
+                     "VALUES (%s, %s)")
+
         for i in range(len(self.match)):            # For each match found in a domain,
             match = self.match.pop(i)               # Take an item from the match list
 
-            self.cursor.execute(self.add_match,     # Add the match into the database
+            self.cursor.execute(add_match,          # Add the match into the database
                                 (match["url"],
                                  match["json"]))
 
-        remove_domain = ("DELETE FROM queued_domains "      # Removing the domain from the queued domains list
+        remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
                          "WHERE %s = domain")
         self.cursor.execute(remove_domain, self.domain)
 
-        add_domain = ("INSERT INTO completed_domains "      # Adding the domain to the completed domains list
+        add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
                       "(domain)"
                       "VALUES "
                       "(%s)")
         self.cursor.execute(add_domain, self.domain)
 
-        self.cursor.commit()    # Make sure the data is committed to the database
+        self.cursor.commit()                                # Make sure the data is committed to the database
 
 def get_domain(link):
     """
