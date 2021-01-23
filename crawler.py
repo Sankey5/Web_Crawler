@@ -6,7 +6,7 @@ import queue                    # Queues sites/domains to search
 import time                     # Times program
 import re                       # Regular expressions used for searching the data in webpages
 
-class Scraper():
+class Scraper:
     def __init__(self, database, explored_domains=None):
         # -------Variables----------------------------
         self.timeout = 5                        # Used for connections functions
@@ -90,8 +90,12 @@ class Scraper():
 
 # ---Explore-Domains-------------------------
 
-    # Looks through all links found and explores them
     def explore_domains(self):
+        """
+        Explores all of the domains in the unexplored domains queue, explores the sites
+        in it's sitemap, exports the data found to the database
+        :return:
+        """
 
         while not self.unexploredDomains.empty():
             
@@ -117,6 +121,11 @@ class Scraper():
             print("Domains left - {}".format(self.unexploredDomains.qsize()))
 
     def crawl_sitemap(self, domain):
+        """
+        Explores the sitemap of the given domain and populates the unexplore sites queue
+        :param domain:
+        :return:
+        """
 
         self.prepare(domain)                                        # Prepare soup
 
@@ -126,14 +135,17 @@ class Scraper():
                 self.crawl_sitemap(site.text)
         else:                                                       # If sitemap is small, add all domains to queue
             for site in self.soup.find_all("loc"):
-                if not site:                                        # If there are no sites in this sitemap, return
-                    return
-                if site not in list(self.unexploredSites.queue):    # If the site hasn't been explored, add it.
+                if site not in list(self.unexploredSites.queue) and site:    # If the site hasn't been explored, add it.
                     self.unexploredSites.put(site.text)
 
 # ---Explore-Sites----------------------------
     
     def explore_sites(self):
+        """
+        Explores all sites that were found in the sitemap.xml of the next site in the
+        unexplored Sites queue
+        :return:
+        """
         i = 0
 
         self.domain = "http://www." + self.domain + "/sitemap.xml"  # Apply necessary text for first request
@@ -195,7 +207,7 @@ class Scraper():
 
 
 
-    # ---Database-functions-----------------------
+# ---Database-functions-----------------------
 
     def open_database(self):
         """
@@ -219,6 +231,10 @@ class Scraper():
         self.connector.close()
 
     def get_unexplored_domains(self):
+        """
+        Gets the uncompleted domains from the database
+        :return:
+        """
         self.open_database()
 
         get_unexplored_domains = ("SELECT * FROM unexplored_domains")  # Get unexplored domains
@@ -230,6 +246,10 @@ class Scraper():
         self.close_database()
 
     def get_explored_domains(self):
+        """
+        Gets the completed domains from the database
+        :return:
+        """
         self.open_database()
 
         get_explored_domains = ("SELECT * FROM explored_domains")  # Get completed domains
@@ -249,14 +269,15 @@ class Scraper():
         """
 
         add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
-                      "(domain)"
+                      "('domain') "
                       "VALUES "
                       "(%s)")
 
         self.open_database()
 
         for domain in domains:                              # For every unexplored domain,
-            self.cursor.execute(add_domain, domain)         # add it to the database
+            print("---->Adding domain to database: ", domain)
+            self.cursor.execute(add_domain, (domain,))      # add it to the database
 
         self.close_database()
 
@@ -266,9 +287,12 @@ class Scraper():
         Takes the data scraped from a domain and exports it to the MySQL database
         The database table looks like this:
             (CREATE TABLE schema_match (
-                url varchar() NOT NULL,
-                json varchar() NOT NULL,
-                PRIMARY KEY(url)) ENGINE=InnoDB)
+                domain varchar(128) NOT NULL,
+                url varchar(500) NOT NULL,
+                json varchar(MAX) NOT NULL,
+                PRIMARY KEY(url),
+                FOREIGN KEY(domain) REFERENCES unexplored_domains(domain)) ENGINE=InnoDB)
+
 
         This function should always be prepended with the open_database()
         and close_database() functions.
@@ -278,35 +302,36 @@ class Scraper():
         print("Transferring data to the database")
 
         add_match = ("INSERT INTO schema_match "    # MySQL to add a match to the database
-                     "(url, json)"
-                     "VALUES (%s, %s)")
+                     "(domain, url, json)"
+                     "VALUES (%s, %s, %s)")
 
         for i in range(len(self.match)):            # For each match found in a domain,
             match = self.match.pop(i)               # Take an item from the match list
 
             self.cursor.execute(add_match,          # Add the match into the database
-                                (match["url"],
+                                (self.domain,
+                                 match["url"],
                                  match["json"]))
 
         """unexplored_domains table should look like this:
                 CREATE TABLE unexplored_table (
-                    domain varchar() NOT NULL,
+                    domain varchar(128) NOT NULL,
                     PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
         remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
                          "WHERE %s = domain")
         self.cursor.execute(remove_domain, self.domain)
 
-        """unexplored_domains table should look like this:
+        """explored_domains table should look like this:
             CREATE TABLE explored_table (
-                domain varchar() NOT NULL,
+                domain varchar(128) NOT NULL,
                 PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
         add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
                       "(domain)"
                       "VALUES "
                       "(%s)")
-        self.cursor.execute(add_domain, self.domain)
+        self.cursor.execute(add_domain, (self.domain,))
 
         self.cursor.commit()                                # Make sure the data is committed to the database
 
