@@ -1,10 +1,11 @@
-from bs4 import BeautifulSoup   # Crawls and scrapes site content
-from tld import get_fld         # Parses for domain names
-import mysql.connector          # MySQL database to store script contents/json
-import requests                 # Connects and gets content from sites
-import queue                    # Queues sites/domains to search
-import time                     # Times program
-import re                       # Regular expressions used for searching the data in webpages
+from bs4 import BeautifulSoup           # Crawls and scrapes site content
+from tld import get_fld                 # Parses for domain names
+import mysql.connector                  # MySQL database to store script contents/json
+from mysql.connector import errorcode   # Error codes for MySQL
+import requests                         # Connects and gets content from sites
+import queue                            # Queues sites/domains to search
+import time                             # Times program
+import re                               # Regular expressions used for searching the data in webpages
 
 class Scraper:
     def __init__(self, database, explored_domains=None):
@@ -215,10 +216,19 @@ class Scraper:
         :return:
         """
         # Connects to the mysql database using the supplied credentials
-        self.connector = mysql.connector.connect(user=self.database["username"],
-                                                 password=self.database["password"],
-                                                 host=self.database["host"],
-                                                 database=self.database["database"])
+        try:
+            self.connector = mysql.connector.connect(user=self.database["username"],
+                                                     password=self.database["password"],
+                                                     host=self.database["host"],
+                                                     database=self.database["database"])
+        except mysql.connector.Error as err:
+            if err.errno == errorcode.ER_ACCESS_DENIED_ERROR:
+                print("Something is wrong with your user name or password")
+            elif err.errno == errorcode.ER_BAD_DB_ERROR:
+                print("Database does not exist")
+            else:
+                print(err)
+
 
         self.cursor = self.connector.cursor(prepared=True)  # Enables the execution of a prepared statement
 
@@ -333,7 +343,7 @@ class Scraper:
                       "(%s)")
         self.cursor.execute(add_domain, (self.domain,))
 
-        self.cursor.commit()                                # Make sure the data is committed to the database
+        self.connector.commit()                                # Make sure the data is committed to the database
 
 def get_domain(link):
     """
