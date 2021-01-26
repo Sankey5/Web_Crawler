@@ -55,14 +55,19 @@ class Scraper:
 
     # Create a beautiful soup object
     def prepare(self, url):
-
+        
+        print("Preparing")
         self.handshake(url)
+        print("Making")
         self.make_soup()
+        print("Done making")
 
     # Make a request for the specified website, and get the http response code and site content
     def handshake(self, url):
         response = False    # Flag to send more requests if first one fails
         fails = 0           # Counter to set maximum amount of fails
+
+        print("URL: ",url)
 
         while not response and fails < 2:
             try:
@@ -70,23 +75,26 @@ class Scraper:
                 response = True
             except:
                 print("{} - There was an error connecting!\nTry again!\n".format(self.site))  # prints status code
-                fails+= 1                   # If an error occurs, increment
+                fails += 1                  # If an error occurs, increment
                 time.sleep(self.timeout)    # Wait to connect again
 
     # Create a soup object to represent the site content
     def make_soup(self):
         response = False    # Flag to send more requests if first one fails
-        i = 0               # Counter to set maximum amount of fails
+        fails = 0               # Counter to set maximum amount of fails
 
-        while not response and i < 2:  # while loop to try creating soup
+        while not response and fails < 2:  # while loop to try creating soup
             try:
                 self.soup = BeautifulSoup(self.site.content,    # creates BeautifulSoup Object from request
                                           'lxml')               # parses with lxml library (Fastest)
 
                 response = True  # will break loop
+
+                fails += 1
+                print("Fails: ",fails)
             except:
                 print("There was an error making soup!\nTry again!\n")
-                i += 1
+                fails += 1
                 time.sleep(self.timeout)
 
 # ---Explore-Domains-------------------------
@@ -160,8 +168,10 @@ class Scraper:
             print("--> Exploring site - {}".format(self.url))
 
             if i % 100 == 0:
+                print("-----------------------------------------------")
                 print("Sites remaining - {}: Domains Accumulated - {}".format(self.unexploredSites.qsize(),
                                                                              self.unexploredDomains.qsize()))
+                print("-----------------------------------------------")
         
             self.prepare(self.url)          # Get site html
 
@@ -247,11 +257,11 @@ class Scraper:
         """
         self.open_database()
 
-        get_unexplored_domains = ("SELECT * FROM unexplored_domains")  # Get unexplored domains
+        get_unexplored_domains = ("SELECT * FROM unexplored_domain")  # Get unexplored domains
         self.cursor.execute(get_unexplored_domains)
 
         for domain in self.cursor:                  # Move each query to the unexplored domains list
-            self.unexploredDomains.put(domain)
+            self.unexploredDomains.put(domain[0])
 
         self.close_database()
 
@@ -262,12 +272,12 @@ class Scraper:
         """
         self.open_database()
 
-        get_explored_domains = ("SELECT * FROM explored_domains")  # Get completed domains
+        get_explored_domains = ("SELECT * FROM explored_domain")  # Get completed domains
         self.cursor.execute(get_explored_domains)
 
         for domain in self.cursor:                  # Move each query to the explored domains list
             if domain not in self.exploredDomains:  # If this query is not in the given explored domains list,
-                self.exploredDomains.append(domain) # Add it to the list
+                self.exploredDomains.append(domain[0]) # Add it to the list
 
         self.close_database()
 
@@ -278,10 +288,10 @@ class Scraper:
         :return:
         """
 
-        add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
-                      "('domain') "
+        add_domain = ("INSERT INTO unexplored_domain "      # Adding the domain to the completed domains list
+                      "(domain) "
                       "VALUES "
-                      "(%s)")
+                      "(%s);")
 
         self.open_database()
 
@@ -289,6 +299,7 @@ class Scraper:
             print("---->Adding domain to database: ", domain)
             self.cursor.execute(add_domain, (domain,))      # add it to the database
 
+        self.connector.commit()                             # Commit the data to the database
         self.close_database()
 
 
@@ -311,15 +322,22 @@ class Scraper:
 
         print("Transferring data to the database")
 
+        domain = get_domain(self.domain)            # Get the top level domain
+
+        if not domain:
+            print("Not a domain")
+            return
+
         add_match = ("INSERT INTO schema_match "    # MySQL to add a match to the database
                      "(domain, url, json)"
                      "VALUES (%s, %s, %s)")
 
         for i in range(len(self.match)):            # For each match found in a domain,
+            print(len(self.match))
             match = self.match.pop(i)               # Take an item from the match list
 
             self.cursor.execute(add_match,          # Add the match into the database
-                                (self.domain,
+                                (domain,
                                  match["url"],
                                  match["json"]))
 
@@ -328,20 +346,20 @@ class Scraper:
                     domain varchar(128) NOT NULL,
                     PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
-        remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
+        remove_domain = ("DELETE FROM unexplored_domain "      # Removing the domain from the queued domains list
                          "WHERE %s = domain")
-        self.cursor.execute(remove_domain, self.domain)
+        self.cursor.execute(remove_domain, (domain,))
 
         """explored_domains table should look like this:
             CREATE TABLE explored_table (
                 domain varchar(128) NOT NULL,
                 PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
-        add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
+        add_domain = ("INSERT INTO explored_domain "      # Adding the domain to the completed domains list
                       "(domain)"
                       "VALUES "
                       "(%s)")
-        self.cursor.execute(add_domain, (self.domain,))
+        self.cursor.execute(add_domain, (domain,))
 
         self.connector.commit()                                # Make sure the data is committed to the database
 
