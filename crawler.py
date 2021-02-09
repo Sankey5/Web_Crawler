@@ -288,7 +288,7 @@ class Scraper:
         :return:
         """
 
-        add_domain = ("INSERT INTO unexplored_domains "      # Adding the domain to the completed domains list
+        add_domain = ("INSERT INTO unexplored_domain "      # Adding the domain to the completed domains list
                       "('domain') "
                       "VALUES "
                       "(%s);")
@@ -346,7 +346,7 @@ class Scraper:
                     domain varchar(128) NOT NULL,
                     PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
-        remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
+        remove_domain = ("DELETE FROM unexplored_domain "      # Removing the domain from the queued domains list
                          "WHERE domain = %s")
         self.cursor.execute(remove_domain, (domain,))
 
