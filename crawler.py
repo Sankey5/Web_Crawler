@@ -278,7 +278,7 @@ class Scraper:
         :return:
         """
 
-        add_domain = ("INSERT INTO explored_domains "      # Adding the domain to the completed domains list
+        add_domain = ("INSERT INTO unexplored_domains "      # Adding the domain to the completed domains list
                       "('domain') "
                       "VALUES "
                       "(%s)")
@@ -311,6 +311,12 @@ class Scraper:
 
         print("Transferring data to the database")
 
+        domain = get_domain(self.domain)            # Get the told level domain
+
+        if not domain:
+            print("Not a domain")
+            return
+
         add_match = ("INSERT INTO schema_match "    # MySQL to add a match to the database
                      "(domain, url, json)"
                      "VALUES (%s, %s, %s)")
@@ -319,7 +325,7 @@ class Scraper:
             match = self.match.pop(i)               # Take an item from the match list
 
             self.cursor.execute(add_match,          # Add the match into the database
-                                (self.domain,
+                                (domain,
                                  match["url"],
                                  match["json"]))
 
@@ -329,8 +335,8 @@ class Scraper:
                     PRIMARY KEY(domain)) ENGINE=InnoDB)"""
 
         remove_domain = ("DELETE FROM unexplored_domains "      # Removing the domain from the queued domains list
-                         "WHERE %s = domain")
-        self.cursor.execute(remove_domain, self.domain)
+                         "WHERE domain = %s")
+        self.cursor.execute(remove_domain, (domain,))
 
         """explored_domains table should look like this:
             CREATE TABLE explored_table (
@@ -341,7 +347,7 @@ class Scraper:
                       "(domain)"
                       "VALUES "
                       "(%s)")
-        self.cursor.execute(add_domain, (self.domain,))
+        self.cursor.execute(add_domain, (domain,))
 
         self.connector.commit()                                # Make sure the data is committed to the database
 
