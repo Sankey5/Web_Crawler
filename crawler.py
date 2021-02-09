@@ -289,7 +289,7 @@ class Scraper:
         """
 
         add_domain = ("INSERT INTO unexplored_domain "      # Adding the domain to the completed domains list
-                      "('domain') "
+                      "(domain) "
                       "VALUES "
                       "(%s);")
 
