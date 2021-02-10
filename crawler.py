@@ -308,9 +308,10 @@ class Scraper:
         Takes the data scraped from a domain and exports it to the MySQL database
         The database table looks like this:
             (CREATE TABLE schema_match (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
                 domain varchar(128) NOT NULL,
                 url varchar(500) NOT NULL,
-                json varchar(MAX) NOT NULL,
+                json varchar(5000) NOT NULL,
                 PRIMARY KEY(url),
                 FOREIGN KEY(domain) REFERENCES unexplored_domains(domain)) ENGINE=InnoDB)
 
@@ -333,13 +334,17 @@ class Scraper:
                      "VALUES (%s, %s, %s)")
 
         for i in range(len(self.match)):            # For each match found in a domain,
-            print(len(self.match))
-            match = self.match.pop(i)               # Take an item from the match list
+            try:
+                print("Adding {} out of {}".format(i,len(self.match)))
+                match = self.match.pop(0)               # Take an item from the match list
 
-            self.cursor.execute(add_match,          # Add the match into the database
-                                (domain,
-                                 match["url"],
-                                 match["json"]))
+                self.cursor.execute(add_match,          # Add the match into the database
+                                    (domain,
+                                     match["url"],
+                                     match["json"]))
+            except mysql.connector.IntegrityError as err:   # If a duplicate is encountered,
+                print("Error: {}".format(err))
+                continue                                    # Print the error and go to the next item.
 
         """unexplored_domains table should look like this:
                 CREATE TABLE unexplored_table (
