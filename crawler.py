@@ -208,7 +208,7 @@ class Scraper:
             domain = get_domain(new_link)               # Gets a domain if it exists
 
             # If the link has a domain that has not been explored, add it to the unexplored list.
-            if domain and domain not in self.exploredDomains and domain not in list(self.unexploredDomains.queue) and domain != self.domain:
+            if domain and domain not in self.exploredDomains and domain not in list(self.unexploredDomains.queue) and (domain != self.domain):
                 # Used this to error check duplicate domains.
                 # print("Difference - {}".format(len(list(self.unexploredDomains.queue)) - len(set(self.unexploredDomains.queue))))
                 self.unexploredDomains.put(domain)
@@ -297,7 +297,8 @@ class Scraper:
 
         for domain in domains:                              # For every unexplored domain,
             print("---->Adding domain to database: ", domain)
-            self.cursor.execute(add_domain, (domain,))      # add it to the database
+            if domain:                           # If the domain is not the current domain,
+                self.cursor.execute(add_domain, (domain,))      # add it to the database
 
         self.connector.commit()                             # Commit the data to the database
         self.close_database()
