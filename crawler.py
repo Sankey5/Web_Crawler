@@ -114,7 +114,7 @@ class Scraper:
                 print("skipped")
                 continue
 
-            self.exploredDomains.append(self.domain)        # Add it to the list of explored sites
+            #self.exploredDomains.append(self.domain)        # Add it to the list of explored sites
 
             print("-----------------------------------------")
             print("Exploring {}".format(self.domain))
@@ -208,7 +208,7 @@ class Scraper:
             domain = get_domain(new_link)               # Gets a domain if it exists
 
             # If the link has a domain that has not been explored, add it to the unexplored list.
-            if domain and domain not in self.exploredDomains and domain not in list(self.unexploredDomains.queue):
+            if domain and domain not in self.exploredDomains and domain not in list(self.unexploredDomains.queue) and domain != self.domain:
                 # Used this to error check duplicate domains.
                 # print("Difference - {}".format(len(list(self.unexploredDomains.queue)) - len(set(self.unexploredDomains.queue))))
                 self.unexploredDomains.put(domain)
